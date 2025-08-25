@@ -8,7 +8,8 @@ dotenv.config({ path: "./config.env" });
 const user = process.env.USER_NAME;
 const password = process.env.PASSWORD;
 
-const MONGODB_URI = `mongodb+srv://${user}:${password}@moneymgrdb.yqaumak.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+const MONGODB_URI = `mongodb+srv://${user}:${password}@moneymgrdb.yqaumak.mongodb.net/
+`;
 
 mongoose
   .connect(MONGODB_URI)
