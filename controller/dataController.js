@@ -32,7 +32,7 @@ exports.createData = async (req, res) => {
 
 exports.getAllData = async (req, res) => {
   try {
-    const allData = await Data.find();
+    const allData = await Data.find().sort({ date: -1 });
     res.status(200).json({
       message: "success",
       data: allData,
@@ -67,7 +67,7 @@ exports.getDataByYearAndMonth = async (req, res) => {
         $gte: startDate,
         $lt: endDate,
       },
-    });
+    }).sort({ date: -1 });
     res.status(200).json({
       message: "success",
       data: data,
