@@ -2,6 +2,7 @@ const express = require("express");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const dataRoutes = require("./routes/dataRoutes");
+const categoryRoutes = require("./routes/categoryRoutes");
 
 const app = express();
 app.use(express.json());
@@ -20,6 +21,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 app.use("/api", dataRoutes);
+app.use("/api", categoryRoutes);
 app.get("/", (req, res) => {
   res.send("API is running...");
 });
