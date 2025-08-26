@@ -8,7 +8,11 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 
-const allowedOrigins = ["http://localhost:3001", "http://localhost:3000"];
+const allowedOrigins = [
+  "http://localhost:3001",
+  "http://localhost:3000",
+  "https://rpgmoney-mgr.netlify.app",
+];
 
 const corsOptions = {
   origin: allowedOrigins,
