@@ -70,10 +70,10 @@ const DataModel = mongoose.model("Data", dataSchema);
 async function main() {
   try {
     // Connect to MongoDB
-    await mongoose.connect(
-      `mongodb+srv://rohg505:gaYr7aiaJRIZox15@moneymgrdb.yqaumak.mongodb.net/moneyMgr?retryWrites=true&w=majority&appName=Cluster0`,
-      { useNewUrlParser: true, useUnifiedTopology: true }
-    );
+    await mongoose.connect(``, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
     console.log("✅ Connected to MongoDB");
 
     if (parsedData.length === 0) {
