@@ -23,6 +23,8 @@ async function clearCache(key = CACHE_KEY) {
   const client = await getRedisClient();
   const exists = await client.exists(key);
   if (exists) await client.del(key);
+  const monthData = await client.keys(`${key}:*`);
+  if (monthData.length) await client.del(monthData);
 }
 
 const monthNames = [
@@ -79,6 +81,7 @@ exports.getDataByYearAndMonth = async (req, res) => {
 
     // Convert month to number if text
     month = isNaN(month) ? monthNames.indexOf(month) + 1 : parseInt(month, 10);
+
     if (month < 1 || month > 12)
       return res.status(400).json({ message: "Invalid month" });
 
@@ -88,9 +91,25 @@ exports.getDataByYearAndMonth = async (req, res) => {
     const endDate = new Date(startDate);
     endDate.setMonth(endDate.getMonth() + 1);
 
+    const client = await getRedisClient();
+    const cached = await client.get(`${CACHE_KEY}:${year}:${month}`);
+
+    if (cached) {
+      return res.status(200).json({
+        message: "success (cached)",
+        data: JSON.parse(cached),
+      });
+    }
+
     const data = await Data.find({
       date: { $gte: startDate, $lt: endDate },
     }).sort({ date: -1 });
+
+    await client.setEx(
+      `${CACHE_KEY}:${year}:${month}`,
+      CACHE_EXPIRY,
+      JSON.stringify(data)
+    );
 
     res.status(200).json({ message: "success", data });
   } catch (error) {
