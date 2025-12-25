@@ -12,7 +12,7 @@ const allowedOrigins = [
   "http://localhost:3001",
   "http://localhost:3000",
   "https://rpgmoney-mgr.netlify.app",
-  "http://rpg-money-mgr-env.eba-zydjgggm.ap-southeast-1.elasticbeanstalk.com/",
+  "http://rpg-money-mgr-env.eba-zydjgggm.ap-southeast-1.elasticbeanstalk.com",
 ];
 
 const corsOptions = {
