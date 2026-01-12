@@ -21,42 +21,13 @@ async function getRedisClient() {
   return redisClient;
 }
 
-// Efficiently delete keys using SCAN to avoid blocking Redis
-async function deleteByPattern(client, pattern) {
-  const toDelete = [];
-  // Use scanIterator to stream keys matching the pattern
-  for await (const k of client.scanIterator({ MATCH: pattern, COUNT: 500 })) {
-    toDelete.push(k);
-    if (toDelete.length >= 500) {
-      await client.del(toDelete);
-      toDelete.length = 0;
-    }
-  }
-  if (toDelete.length) {
-    await client.del(toDelete);
-  }
-}
-
 // Clear cache for all key groups by default
 async function clearCache(key = "ALL") {
   const client = await getRedisClient();
-
-  // Determine which base keys to clear
-  const baseKeys =
-    key === "ALL"
-      ? [CACHE_KEY, CACHE_FINANCIAL_YEAR_KEY, CACHE_FINANCIAL_DATA_YEAR_KEY]
-      : [key];
-
-  for (const baseKey of baseKeys) {
-    try {
-      // Delete the base key if present
-      await deleteByPattern(client, baseKey);
-
-      // Delete any derived keys like baseKey:*, e.g., year/month variants
-      await deleteByPattern(client, `${baseKey}:*`);
-    } catch (err) {
-      console.warn(`Failed to clear cache for pattern ${baseKey}:`, err);
-    }
+  try {
+    await client.flushDb();
+  } catch (err) {
+    console.error("Failed to clear cache:", err);
   }
 }
 
@@ -89,18 +60,18 @@ exports.createData = async (req, res) => {
 
 exports.getAllData = async (req, res) => {
   try {
-    const client = await getRedisClient();
-    const cached = await client.get(CACHE_KEY);
+    // const client = await getRedisClient();
+    // const cached = await client.get(CACHE_KEY);
 
-    if (cached) {
-      return res.status(200).json({
-        message: "success (cached)",
-        data: JSON.parse(cached),
-      });
-    }
+    // if (cached) {
+    //   return res.status(200).json({
+    //     message: "success (cached)",
+    //     data: JSON.parse(cached),
+    //   });
+    // }
 
     const allData = await Data.find().sort({ date: -1 });
-    await client.setEx(CACHE_KEY, CACHE_EXPIRY, JSON.stringify(allData));
+    // await client.setEx(CACHE_KEY, CACHE_EXPIRY, JSON.stringify(allData));
 
     res.status(200).json({ message: "success", data: allData });
   } catch (error) {
