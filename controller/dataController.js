@@ -7,6 +7,7 @@ dotenv.config({ path: "./config.env" });
 const redis_url = process.env.REDIS_URL;
 const CACHE_KEY = "allData";
 const CACHE_FINANCIAL_YEAR_KEY = "financial_year";
+const CACHE_FINANCIAL_YEAR_ALL_KEY = "financialYearAll";
 const CACHE_FINANCIAL_DATA_YEAR_KEY = "financialDatayear";
 const CACHE_EXPIRY = 3600 * 4; // 4 hours
 
@@ -85,15 +86,15 @@ exports.getYearlyFinancialData = async (req, res) => {
 
     const startDate = new Date(`${year}-01-01T00:00:00.000Z`);
     const endDate = new Date(`${parseInt(year, 10) + 1}-01-01T00:00:00.000Z`);
-    const client = await getRedisClient();
-    const cached = await client.get(`${CACHE_FINANCIAL_DATA_YEAR_KEY}:${year}`);
+    // const client = await getRedisClient();
+    // const cached = await client.get(`${CACHE_FINANCIAL_DATA_YEAR_KEY}:${year}`);
 
-    if (cached) {
-      return res.status(200).json({
-        message: "success (cached)",
-        data: JSON.parse(cached),
-      });
-    }
+    // if (cached) {
+    //   return res.status(200).json({
+    //     message: "success (cached)",
+    //     data: JSON.parse(cached),
+    //   });
+    // }
 
     const data = await Data.find({
       date: { $gte: startDate, $lt: endDate },
@@ -114,12 +115,64 @@ exports.getYearlyFinancialData = async (req, res) => {
       }
     });
 
-    await client.setEx(`${CACHE_FINANCIAL_DATA_YEAR_KEY}:${year}`, CACHE_EXPIRY, JSON.stringify({monthlyDataArray }));
+    // await client.setEx(
+    //   `${CACHE_FINANCIAL_DATA_YEAR_KEY}:${year}`,
+    //   CACHE_EXPIRY,
+    //   JSON.stringify({ monthlyDataArray })
+    // );
 
     res.status(200).json({
       message: "success",
       data: monthlyDataArray,
     });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+exports.getAllFinancialDataTypes = async (req, res) => {
+  try {
+    const client = await getRedisClient();
+    const cached = await client.get(CACHE_FINANCIAL_YEAR_ALL_KEY);
+
+    if (cached) {
+      return res.status(200).json({
+        message: "success (cached)",
+        data: JSON.parse(cached),
+      });
+    } else {
+      const data = await Data.find().sort({ date: -1 });  // Sort by date in descending order
+
+      const incomeTypes = {};
+      const expenseTypes = {};
+
+      data.forEach((item) => {
+        if (item.type === "Income") {
+          if (incomeTypes[item.category]) {
+            incomeTypes[item.category] += item.amount;
+          } else {
+            incomeTypes[item.category] = item.amount;
+          }
+        } else if (item.type === "Expense") {
+          if (expenseTypes[item.category]) {
+            expenseTypes[item.category] += item.amount;
+          } else {
+            expenseTypes[item.category] = item.amount;
+          }
+        }
+      });
+
+      await client.setEx(
+        CACHE_FINANCIAL_YEAR_ALL_KEY,
+        CACHE_EXPIRY,
+        JSON.stringify({ incomeTypes, expenseTypes })
+      );
+
+      res.status(200).json({
+        message: "success",
+        data: { incomeTypes, expenseTypes },
+      });
+    }
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
