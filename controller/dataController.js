@@ -86,15 +86,15 @@ exports.getYearlyFinancialData = async (req, res) => {
 
     const startDate = new Date(`${year}-01-01T00:00:00.000Z`);
     const endDate = new Date(`${parseInt(year, 10) + 1}-01-01T00:00:00.000Z`);
-    // const client = await getRedisClient();
-    // const cached = await client.get(`${CACHE_FINANCIAL_DATA_YEAR_KEY}:${year}`);
+    const client = await getRedisClient();
+    const cached = await client.get(`${CACHE_FINANCIAL_DATA_YEAR_KEY}:${year}`);
 
-    // if (cached) {
-    //   return res.status(200).json({
-    //     message: "success (cached)",
-    //     data: JSON.parse(cached),
-    //   });
-    // }
+    if (cached) {
+      return res.status(200).json({
+        message: "success (cached)",
+        data: JSON.parse(cached),
+      });
+    }
 
     const data = await Data.find({
       date: { $gte: startDate, $lt: endDate },
@@ -115,11 +115,11 @@ exports.getYearlyFinancialData = async (req, res) => {
       }
     });
 
-    // await client.setEx(
-    //   `${CACHE_FINANCIAL_DATA_YEAR_KEY}:${year}`,
-    //   CACHE_EXPIRY,
-    //   JSON.stringify({ monthlyDataArray })
-    // );
+    await client.setEx(
+      `${CACHE_FINANCIAL_DATA_YEAR_KEY}:${year}`,
+      CACHE_EXPIRY,
+      JSON.stringify({ IncomeArray:monthlyDataArray.IncomeArray, ExpensesArray:monthlyDataArray.ExpensesArray })
+    );
 
     res.status(200).json({
       message: "success",
