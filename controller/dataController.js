@@ -383,8 +383,6 @@ exports.getReportData = async (req, res) => {
       date: { $gte: new Date(startDate), $lt: new Date(endDate) },
     };
 
-    console.log(filter);
-
     if (category) {
       filter.category = category;
     }
