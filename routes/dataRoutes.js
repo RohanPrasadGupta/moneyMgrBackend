@@ -10,6 +10,9 @@ router.get("/dataReportAll", dataController.getAllFinancialDataTypes);
 router.get("/dataAnalysis/:year/:month", dataController.getMonthlyFinancialDataType);
 router.get("/dataAnalysis/:year", dataController.getYearlyFinancialDataType);
 
+
+router.get("/data/report", dataController.getReportData);
+
 router.get("/data/:id", dataController.getDataById);
 router.put("/data/:id", dataController.updateData);
 router.delete("/data/:id", dataController.deleteData);

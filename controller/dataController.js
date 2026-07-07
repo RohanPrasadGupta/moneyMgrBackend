@@ -368,3 +368,31 @@ exports.deleteData = async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 };
+
+
+exports.getReportData = async (req, res) => {
+  try {
+    const { startDate, endDate, category } = req.query;
+    if (!startDate || !endDate) {
+      return res
+        .status(400)
+        .json({ message: "startDate and endDate are required" });
+    }
+
+    const filter = {
+      date: { $gte: new Date(startDate), $lt: new Date(endDate) },
+    };
+
+    console.log(filter);
+
+    if (category) {
+      filter.category = category;
+    }
+
+    const data = await Data.find(filter).sort({ date: -1 });
+
+    res.status(200).json({ message: "success", data });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
