@@ -2,8 +2,12 @@ const CategoryModel = require("../models/categoryModel");
 
 const createCategory = async (req, res) => {
   try {
-    const { name, categoryType } = req.body;
-    const newCategory = new CategoryModel({ name, categoryType });
+    const { name, categoryType, currency } = req.body;
+    const newCategory = new CategoryModel({
+      name,
+      categoryType,
+      currency: currency || "THB",
+    });
     await newCategory.save();
     res.status(201).json({
       message: "Category created successfully",
@@ -36,10 +40,10 @@ const deleteCategory = async (req, res) => {
 const editCategory = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, categoryType } = req.body;
+    const { name, categoryType, currency } = req.body;
     const updatedCategory = await CategoryModel.findByIdAndUpdate(
       id,
-      { name, categoryType },
+      { name, categoryType, currency: currency || "THB" },
       { new: true }
     );
     res.status(200).json({

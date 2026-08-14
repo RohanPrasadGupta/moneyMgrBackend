@@ -19,6 +19,9 @@ const dataSchema = new mongoose.Schema({
   currency: {
     type: String,
     required: true,
+    uppercase: true,
+    trim: true,
+    default: "THB",
   },
   type: {
     type: String,
