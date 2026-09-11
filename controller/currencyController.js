@@ -10,11 +10,13 @@ const createCurrency = async (req, res) => {
 
     const newCurrency = new CurrencyModel({ code, name, symbol, isDefault });
     await newCurrency.save();
+    console.log("[currency] saved: ", { id: newCurrency._id, code });
     res.status(201).json({
       message: "Currency created successfully",
       currency: newCurrency,
     });
   } catch (error) {
+    console.error("[currency] save failed: ", error.message);
     res.status(500).json({ message: "Error creating currency", error });
   }
 };
@@ -22,8 +24,10 @@ const createCurrency = async (req, res) => {
 const getCurrencies = async (req, res) => {
   try {
     const currencies = await CurrencyModel.find();
+    console.log("[currency] fetched all currencies.");
     res.status(200).json(currencies);
   } catch (error) {
+    console.error("[currency] fetch failed: ", error.message);
     res.status(500).json({ message: "Error fetching currencies", error });
   }
 };
@@ -31,9 +35,15 @@ const getCurrencies = async (req, res) => {
 const deleteCurrency = async (req, res) => {
   try {
     const { id } = req.params;
-    await CurrencyModel.findByIdAndDelete(id);
+    const deleted = await CurrencyModel.findByIdAndDelete(id);
+    if (!deleted) {
+      console.error("[currency] not found: ", { id });
+      return res.status(404).json({ message: "Currency not found" });
+    }
+    console.log("[currency] deleted: ", { id });
     res.status(200).json({ message: "Currency deleted successfully" });
   } catch (error) {
+    console.error("[currency] delete failed: ", error.message);
     res.status(500).json({ message: "Error deleting currency", error });
   }
 };
@@ -52,11 +62,17 @@ const editCurrency = async (req, res) => {
       { code, name, symbol, isDefault },
       { new: true }
     );
+    if (!updatedCurrency) {
+      console.error("[currency] not found: ", { id });
+      return res.status(404).json({ message: "Currency not found" });
+    }
+    console.log("[currency] updated: ", { id });
     res.status(200).json({
       message: "Currency updated successfully",
       currency: updatedCurrency,
     });
   } catch (error) {
+    console.error("[currency] update failed: ", error.message);
     res.status(500).json({ message: "Error updating currency", error });
   }
 };

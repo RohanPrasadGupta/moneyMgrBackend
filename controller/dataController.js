@@ -52,9 +52,10 @@ exports.createData = async (req, res) => {
     const newData = new Data(req.body);
     await newData.save();
     await clearCache();
-
+    console.log("[data] saved: ", { id: newData._id });
     res.status(201).json({ message: "success", data: newData });
   } catch (error) {
+    console.error("[data] save failed: ", error.message);
     res.status(400).json({ message: error.message });
   }
 };
@@ -73,9 +74,10 @@ exports.getAllData = async (req, res) => {
 
     const allData = await Data.find().sort({ date: -1 });
     // await client.setEx(CACHE_KEY, CACHE_EXPIRY, JSON.stringify(allData));
-
+    console.log("[data] fetched all data.");
     res.status(200).json({ message: "success", data: allData });
   } catch (error) {
+    console.error("[data] fetch all failed: ", error.message);
     res.status(400).json({ message: error.message });
   }
 };
@@ -90,6 +92,7 @@ exports.getYearlyFinancialData = async (req, res) => {
     const cached = await client.get(`${CACHE_FINANCIAL_DATA_YEAR_KEY}:${year}`);
 
     if (cached) {
+      console.log("[data] yearly financial (cached): ", { year });
       return res.status(200).json({
         message: "success (cached)",
         data: JSON.parse(cached),
@@ -121,11 +124,13 @@ exports.getYearlyFinancialData = async (req, res) => {
       JSON.stringify({ IncomeArray:monthlyDataArray.IncomeArray, ExpensesArray:monthlyDataArray.ExpensesArray })
     );
 
+    console.log("[data] yearly financial fetched: ", { year });
     res.status(200).json({
       message: "success",
       data: monthlyDataArray,
     });
   } catch (error) {
+    console.error("[data] yearly financial failed: ", error.message);
     res.status(400).json({ message: error.message });
   }
 };
@@ -136,6 +141,7 @@ exports.getAllFinancialDataTypes = async (req, res) => {
     const cached = await client.get(CACHE_FINANCIAL_YEAR_ALL_KEY);
 
     if (cached) {
+      console.log("[data] all financial types (cached).");
       return res.status(200).json({
         message: "success (cached)",
         data: JSON.parse(cached),
@@ -168,12 +174,14 @@ exports.getAllFinancialDataTypes = async (req, res) => {
         JSON.stringify({ incomeTypes, expenseTypes })
       );
 
+      console.log("[data] all financial types fetched.");
       res.status(200).json({
         message: "success",
         data: { incomeTypes, expenseTypes },
       });
     }
   } catch (error) {
+    console.error("[data] all financial types failed: ", error.message);
     res.status(400).json({ message: error.message });
   }
 };
@@ -184,8 +192,10 @@ exports.getMonthlyFinancialDataType = async (req, res) => {
     // Convert month to number if text
     month = isNaN(month) ? monthNames.indexOf(month) + 1 : parseInt(month, 10);
 
-    if (month < 1 || month > 12)
+    if (month < 1 || month > 12) {
+      console.error("[data] invalid month: ", { month });
       return res.status(400).json({ message: "Invalid month" });
+    }
 
     const startDate = new Date(
       `${year}-${month.toString().padStart(2, "0")}-01T00:00:00.000Z`
@@ -199,6 +209,7 @@ exports.getMonthlyFinancialDataType = async (req, res) => {
     );
 
     if (cached) {
+      console.log("[data] monthly financial types (cached): ", { year, month });
       return res.status(200).json({
         message: "success (cached)",
         data: JSON.parse(cached),
@@ -233,8 +244,10 @@ exports.getMonthlyFinancialDataType = async (req, res) => {
       JSON.stringify({ incomeTypes, expenseTypes })
     );
 
+    console.log("[data] monthly financial types fetched: ", { year, month });
     res.status(200).json({ message: "success", incomeTypes, expenseTypes });
   } catch (error) {
+    console.error("[data] monthly financial types failed: ", error.message);
     res.status(400).json({ message: error.message });
   }
 };
@@ -248,6 +261,7 @@ exports.getYearlyFinancialDataType = async (req, res) => {
     const cached = await client.get(`${CACHE_FINANCIAL_YEAR_KEY}:${year}`);
 
     if (cached) {
+      console.log("[data] yearly financial types (cached): ", { year });
       return res.status(200).json({
         message: "success (cached)",
         data: JSON.parse(cached),
@@ -282,8 +296,10 @@ exports.getYearlyFinancialDataType = async (req, res) => {
       JSON.stringify({ incomeTypes, expenseTypes })
     );
 
+    console.log("[data] yearly financial types fetched: ", { year });
     res.status(200).json({ message: "success", incomeTypes, expenseTypes });
   } catch (error) {
+    console.error("[data] yearly financial types failed: ", error.message);
     res.status(400).json({ message: error.message });
   }
 };
@@ -295,8 +311,10 @@ exports.getDataByYearAndMonth = async (req, res) => {
     // Convert month to number if text
     month = isNaN(month) ? monthNames.indexOf(month) + 1 : parseInt(month, 10);
 
-    if (month < 1 || month > 12)
+    if (month < 1 || month > 12) {
+      console.error("[data] invalid month: ", { month });
       return res.status(400).json({ message: "Invalid month" });
+    }
 
     const startDate = new Date(
       `${year}-${month.toString().padStart(2, "0")}-01T00:00:00.000Z`
@@ -308,6 +326,7 @@ exports.getDataByYearAndMonth = async (req, res) => {
     const cached = await client.get(`${CACHE_KEY}:${year}:${month}`);
 
     if (cached) {
+      console.log("[data] by year/month (cached): ", { year, month });
       return res.status(200).json({
         message: "success (cached)",
         data: JSON.parse(cached),
@@ -324,8 +343,10 @@ exports.getDataByYearAndMonth = async (req, res) => {
       JSON.stringify(data)
     );
 
+    console.log("[data] by year/month fetched: ", { year, month });
     res.status(200).json({ message: "success", data });
   } catch (error) {
+    console.error("[data] by year/month failed: ", error.message);
     res.status(400).json({ message: error.message });
   }
 };
@@ -333,10 +354,15 @@ exports.getDataByYearAndMonth = async (req, res) => {
 exports.getDataById = async (req, res) => {
   try {
     const data = await Data.findById(req.params.id);
-    if (!data) return res.status(404).json({ message: "Data not found" });
+    if (!data) {
+      console.error("[data] not found: ", { id: req.params.id });
+      return res.status(404).json({ message: "Data not found" });
+    }
 
+    console.log("[data] fetched: ", { id: req.params.id });
     res.status(200).json({ message: "success", data });
   } catch (error) {
+    console.error("[data] fetch by id failed: ", error.message);
     res.status(400).json({ message: error.message });
   }
 };
@@ -346,12 +372,16 @@ exports.updateData = async (req, res) => {
     const data = await Data.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
     });
-    if (!data) return res.status(404).json({ message: "Data not found" });
+    if (!data) {
+      console.error("[data] not found: ", { id: req.params.id });
+      return res.status(404).json({ message: "Data not found" });
+    }
 
     await clearCache();
-
+    console.log("[data] updated: ", { id: req.params.id });
     res.status(200).json({ message: "success", data });
   } catch (error) {
+    console.error("[data] update failed: ", error.message);
     res.status(400).json({ message: error.message });
   }
 };
@@ -359,12 +389,16 @@ exports.updateData = async (req, res) => {
 exports.deleteData = async (req, res) => {
   try {
     const data = await Data.findByIdAndDelete(req.params.id);
-    if (!data) return res.status(404).json({ message: "Data not found" });
+    if (!data) {
+      console.error("[data] not found: ", { id: req.params.id });
+      return res.status(404).json({ message: "Data not found" });
+    }
 
     await clearCache();
-
+    console.log("[data] deleted: ", { id: req.params.id });
     res.status(200).json({ message: "success", data });
   } catch (error) {
+    console.error("[data] delete failed: ", error.message);
     res.status(400).json({ message: error.message });
   }
 };
@@ -374,6 +408,7 @@ exports.getReportData = async (req, res) => {
   try {
     const { startDate, endDate, category } = req.query;
     if (!startDate || !endDate) {
+      console.error("[data] report missing dates.");
       return res
         .status(400)
         .json({ message: "startDate and endDate are required" });
@@ -388,9 +423,10 @@ exports.getReportData = async (req, res) => {
     }
 
     const data = await Data.find(filter).sort({ date: -1 });
-
+    console.log("[data] report fetched: ", { startDate, endDate, category });
     res.status(200).json({ message: "success", data });
   } catch (error) {
+    console.error("[data] report failed: ", error.message);
     res.status(400).json({ message: error.message });
   }
 };
