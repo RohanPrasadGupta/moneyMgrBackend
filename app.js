@@ -4,6 +4,7 @@ const cors = require("cors");
 const dataRoutes = require("./routes/dataRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const currencyRoutes = require("./routes/currencyRoutes");
+const notesRoutes = require("./routes/notesRoutes")
 
 const app = express();
 app.use(express.json());
@@ -30,6 +31,12 @@ app.use(cors(corsOptions));
 app.use("/api", dataRoutes);
 app.use("/api", categoryRoutes);
 app.use("/api", currencyRoutes);
+app.use("/api", notesRoutes);
+
+app.use("/health",(req,res)=>{
+  res.send("OK")
+})
+
 app.get("/", (req, res) => {
   res.send("API is running...");
 });

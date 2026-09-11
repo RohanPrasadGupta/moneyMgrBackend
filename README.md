@@ -1,6 +1,6 @@
 # moneyMgrBackend
 
-The core REST API behind [MoneyMgr](https://github.com/RohanPrasadGupta/moneyMgr) — an Express + MongoDB backend that stores day-to-day transactions, categories, and the shared currency list. It is one of two sibling backends the frontend talks to; the other, [`stock_analysis_backend`](../stock_analysis_backend), handles stock trades and investment capital.
+The core REST API behind [MoneyMgr](https://github.com/RohanPrasadGupta/moneyMgr) — an Express + MongoDB backend that stores day-to-day transactions, categories, currencies, and free-form notes. It is one of two sibling backends the frontend talks to; the other, [`stock_analysis_backend`](../stock_analysis_backend), handles stock trades and investment capital.
 
 This is a **single-user, unauthenticated API** — there is no login system anywhere in the stack, by design.
 
@@ -13,6 +13,7 @@ This is a **single-user, unauthenticated API** — there is no login system anyw
 | Caching | Redis (response caching on the read-heavy analysis/report endpoints) |
 | Middleware | `cors`, `cookie-parser`, `dotenv` |
 | Dev tooling | `nodemon` (used for both `start` and `dev`) |
+| Logging | `console.log` / `console.error` with tagged prefixes per controller (e.g. `[notes]`, `[data]`) |
 
 `bcrypt`, `bcryptjs`, and `jsonwebtoken` are installed but never imported anywhere — leftover scaffolding from a template, not wired into any route. `xlsx` is used only by the standalone `inserDataExcel.js` import script, not by the running server.
 
@@ -34,9 +35,30 @@ This is a **single-user, unauthenticated API** — there is no login system anyw
 - `express.json()` body parsing, `cookie-parser` (registered but nothing in the app actually sets/reads cookies — no auth uses it today)
 - CORS with an explicit origin allow-list (localhost dev ports, the deployed Netlify frontend, and AWS Elastic Beanstalk/Amplify URLs), `credentials: true`
 - `GET /` — plain-text health check (`"API is running..."`)
-- Three routers, all mounted under `/api`: `dataRoutes`, `categoryRoutes`, `currencyRoutes`
+- `GET /health` — returns `"OK"` (useful for load balancers / Elastic Beanstalk health checks)
+- Four routers, all mounted under `/api`: `dataRoutes`, `categoryRoutes`, `currencyRoutes`, `notesRoutes`
 
 `middleware/` and `config/` exist as directories but are currently empty — no custom middleware is registered beyond the three packages above.
+
+### Server logging
+
+Every controller handler logs success and failure to the server console with a tag prefix:
+
+| Tag | Controller |
+|-----|------------|
+| `[notes]` | `notesController.js` |
+| `[category]` | `categoryController.js` |
+| `[currency]` | `currencyController.js` |
+| `[data]` | `dataController.js` |
+
+Typical patterns:
+
+- Success: `console.log("[notes] saved: ", { id })`
+- Not found: `console.error("[category] not found: ", { id })`
+- Failure: `console.error("[data] update failed: ", error.message)`
+- Cache hits (data only): `console.log("[data] yearly financial (cached): ", { year })`
+
+These go to stdout/stderr and show up in local terminals and Elastic Beanstalk / host process logs.
 
 ## Data models
 
@@ -69,6 +91,14 @@ This is a **single-user, unauthenticated API** — there is no login system anyw
 | `symbol` | String | required, trimmed |
 | `isDefault` | Boolean | default `false` |
 
+### `Notes` — `models/notesModel.js`
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `date` | Date | required, **default `Date.now`** |
+| `title` | String | required |
+| `content` | String | required — plain string; multiline / paragraphs are fine (send `\n` in JSON) |
+
 Because Mongoose `default` only applies to fields left `undefined` at creation time, any `Data`/`Category` document created **before** the `currency` field existed in the schema simply doesn't have it in the database — there is no backfill/migration script. Clients reading old records need their own fallback (the moneyMgr frontend does this).
 
 ## API reference
@@ -81,8 +111,8 @@ All routes are mounted under `/api`. Responses generally follow a `{ message, da
 |--------|------|--------------|
 | `GET` | `/api/currency` | List all currencies |
 | `POST` | `/api/currency` | Create a currency. If `isDefault: true` is sent, every other currency's `isDefault` is unset first |
-| `PUT` | `/api/currency/:id` | Update a currency (same "only one default" behavior, excluding itself) |
-| `DELETE` | `/api/currency/:id` | Delete a currency |
+| `PUT` | `/api/currency/:id` | Update a currency (same "only one default" behavior, excluding itself). Returns `404` if missing |
+| `DELETE` | `/api/currency/:id` | Delete a currency. Returns `404` if missing |
 
 ### Category — `routes/categoryRoutes.js` → `controller/categoryController.js`
 
@@ -90,8 +120,31 @@ All routes are mounted under `/api`. Responses generally follow a `{ message, da
 |--------|------|--------------|
 | `GET` | `/api/category` | List all categories |
 | `POST` | `/api/category` | Create a category (`currency` falls back to `"THB"` explicitly in the controller, on top of the schema default) |
-| `PUT` | `/api/category/:id` | Update a category (same `currency` fallback) |
-| `DELETE` | `/api/category/:id` | Delete a category |
+| `PUT` | `/api/category/:id` | Update a category (same `currency` fallback). Returns `404` if missing |
+| `DELETE` | `/api/category/:id` | Delete a category. Returns `404` if missing |
+
+### Notes — `routes/notesRoutes.js` → `controller/notesController.js`
+
+| Method | Path | Description |
+|--------|------|--------------|
+| `GET` | `/api/allnotes` | List all notes, sorted by `date` desc |
+| `GET` | `/api/getNote/:id` | Single note by MongoDB `_id` (path param — not `?id=`). Returns `404` if missing |
+| `POST` | `/api/addNote` | Create a note. Body: `{ title, content }` (`date` defaults to now) |
+| `PUT` | `/api/updateNote/:id` | Update a note. Returns `404` if missing |
+| `DELETE` | `/api/deleteNote/:id` | Delete a note. Returns `404` if missing |
+
+**Notes path vs query:** `getNote`, `updateNote`, and `deleteNote` expect the id in the URL path (`/api/getNote/<id>`), not as a query string (`?id=`).
+
+**Multiline content:** JSON cannot contain raw line breaks inside a string. Use `\n` (and `\n\n` for paragraph breaks) in the request body, e.g.:
+
+```json
+{
+  "title": "Server config",
+  "content": "HOST = 0.0.0.0\nPORT = 7009\n\nNotes paragraph two."
+}
+```
+
+MongoDB stores the real newlines; the frontend should render with `white-space: pre-wrap` or split on `\n`.
 
 ### Transactions & reports — `routes/dataRoutes.js` → `controller/dataController.js`
 
@@ -117,6 +170,7 @@ All routes are mounted under `/api`. Responses generally follow a `{ message, da
 - **`dataPerYear/:year`** returns two 12-length arrays indexed by `date.getMonth()` (0 = January) for month-by-month charting.
 - **Currency "only one default" enforcement** runs a non-transactional `updateMany({ isDefault: false })` before saving the new/edited default — there is a theoretical race condition under concurrent writes, though this is a single-user app in practice.
 - **Redis caching**: most `GET` report/aggregate endpoints are cached with a 4-hour TTL, keyed per endpoint (some further namespaced by year/month). Any write (`createData`, `updateData`, `deleteData`) calls `clearCache()`, which does a **full `flushDb()`** on the Redis instance — this clears the entire Redis database, not just money-manager-prefixed keys, so don't share this Redis instance with unrelated services. `getAllData`'s own caching code exists but is currently commented out (disabled).
+- **Notes** are independent of transactions/categories — no Redis caching, no foreign keys; CRUD only.
 
 ## Environment variables
 
@@ -172,24 +226,27 @@ The API listens on `http://localhost:<PORT>` (default `5000`, or `8000` per the 
 
 ```
 moneyMgrBackend/
-├── app.js                # Express app: middleware, CORS, route mounting
-├── server.js              # Entry point: env loading, DB connect, currency seed, HTTP listen
+├── app.js                  # Express app: middleware, CORS, route mounting, /health
+├── server.js               # Entry point: env loading, DB connect, currency seed, HTTP listen
 ├── config.env              # Local env vars (gitignored)
 ├── controller/
-│   ├── dataController.js   # Transactions + analysis/report aggregation + Redis caching
+│   ├── dataController.js   # Transactions + analysis/report aggregation + Redis caching + logs
 │   ├── categoryController.js
-│   └── currencyController.js
+│   ├── currencyController.js
+│   └── notesController.js  # Notes CRUD + logs
 ├── models/
 │   ├── dataModel.js        # Transaction schema
 │   ├── categoryModel.js
-│   └── currencyModel.js
+│   ├── currencyModel.js
+│   └── notesModel.js       # Notes schema (title, content, date)
 ├── routes/
 │   ├── dataRoutes.js
 │   ├── categoryRoutes.js
-│   └── currencyRoutes.js
-├── middleware/              # (currently empty)
-├── config/                  # (currently empty)
-└── inserDataExcel.js         # One-off script for bulk-importing transactions from an Excel export
+│   ├── currencyRoutes.js
+│   └── notesRoutes.js
+├── middleware/             # (currently empty)
+├── config/                 # (currently empty)
+└── inserDataExcel.js       # One-off script for bulk-importing transactions from an Excel export
 ```
 
 ## Related repos
@@ -203,3 +260,4 @@ moneyMgrBackend/
 - No data migration for records created before the `currency` field existed
 - Several `config.env` variables and npm dependencies (`bcrypt`, `bcryptjs`, `jsonwebtoken`) are unused leftovers, not active functionality
 - `getAllData`'s caching path is present but disabled in code
+- Notes have no Redis caching and no search/filter endpoints beyond list + get-by-id
